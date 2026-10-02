@@ -1,0 +1,711 @@
+/* SheetCraft — a dense, desktop-style spreadsheet UI. */
+
+:root {
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --chrome: #f1f3f5;
+  --border: #d7dbe0;
+  --border-strong: #b9c0c8;
+  --grid-line: #dfe3e8;
+  --header-bg: #f7f8fa;
+  --header-fg: #5b6572;
+  --text: #1f2733;
+  --text-dim: #6b7684;
+  --accent: #2f6fed;
+  --accent-soft: #dbe6ff;
+  --selection: rgba(47, 111, 237, 0.12);
+  --selection-border: #2f6fed;
+  --active-cell: #ffffff;
+  --danger: #c2436b;
+  --ok: #1f9254;
+  --row-h: 22px;
+  --col-w: 96px;
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --mono: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ shell */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.titlebar .brand {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.titlebar .doc-name {
+  color: var(--text-dim);
+}
+
+.titlebar .spacer {
+  flex: 1;
+}
+
+/* ------------------------------------------------------------------ ribbon */
+
+.ribbon {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 8px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.ribbon-group {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 6px;
+  border-right: 1px solid var(--border);
+}
+
+.ribbon-group:last-child {
+  border-right: none;
+}
+
+.ribbon-group > .label {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+  margin-top: 2px;
+  letter-spacing: 0.3px;
+}
+
+.ribbon-row {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.tool:hover:not(:disabled) {
+  background: var(--chrome);
+  border-color: var(--border);
+}
+
+.tool:active:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.tool:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tool.icon {
+  padding: 4px 6px;
+  font-size: 14px;
+  min-width: 26px;
+  justify-content: center;
+}
+
+.tool.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.tool-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 2px 4px;
+}
+
+.zoom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+}
+
+/* ------------------------------------------------------------- formula bar */
+
+.formula-bar {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.name-box {
+  width: 130px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  border-right: 1px solid var(--border);
+  font-weight: 600;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.formula-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 5px 8px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.fx {
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  color: var(--text-dim);
+  border-left: 1px solid var(--border);
+  font-style: italic;
+  font-family: var(--mono);
+}
+
+/* ------------------------------------------------------------------- main */
+
+.workspace {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.grid-host {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--panel);
+  min-width: 0;
+}
+
+.grid-canvas {
+  display: block;
+  outline: none;
+}
+
+.cell-editor {
+  position: absolute;
+  z-index: 5;
+  border: 2px solid var(--accent);
+  padding: 1px 3px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  resize: none;
+  outline: none;
+  overflow: hidden;
+  background: var(--active-cell);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+}
+
+.cell-editor.text {
+  font-family: var(--font);
+}
+
+/* --------------------------------------------------------------- side pane */
+
+.side-pane {
+  width: 380px;
+  border-left: 1px solid var(--border);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.side-pane.wide {
+  width: 520px;
+}
+
+.pane-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.pane-header .spacer {
+  flex: 1;
+}
+
+.pane-body {
+  flex: 1;
+  overflow: auto;
+  padding: 10px;
+}
+
+.pane-section {
+  margin-bottom: 14px;
+}
+
+.pane-section h4 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.row.wrap {
+  flex-wrap: wrap;
+}
+
+.row label {
+  min-width: 96px;
+  color: var(--text-dim);
+}
+
+input[type='text'],
+input[type='number'],
+select,
+textarea {
+  font-family: inherit;
+  font-size: 12.5px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--text);
+  outline: none;
+}
+
+input[type='text']:focus,
+input[type='number']:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+textarea.code {
+  width: 100%;
+  min-height: 120px;
+  font-family: var(--mono);
+  resize: vertical;
+}
+
+.btn {
+  padding: 5px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--chrome);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.btn.danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* ---------------------------------------------------------------- tabs bar */
+
+.tabbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: var(--chrome);
+  border-top: 1px solid var(--border);
+  user-select: none;
+}
+
+.sheet-tabs {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  flex: 1;
+  scrollbar-width: thin;
+}
+
+.sheet-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: var(--panel);
+  white-space: nowrap;
+}
+
+.sheet-tab.active {
+  background: var(--panel);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.sheet-tab .close {
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.sheet-tab .close:hover {
+  color: var(--danger);
+}
+
+/* ------------------------------------------------------------- status bar */
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 3px 10px;
+  background: var(--chrome);
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--text-dim);
+  user-select: none;
+}
+
+.statusbar .spacer {
+  flex: 1;
+}
+
+.statusbar .badge {
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: #1b4bb8;
+}
+
+.statusbar .badge.warn {
+  background: #fdeccf;
+  color: #8a5a00;
+}
+
+.statusbar .badge.error {
+  background: #fbdde5;
+  color: var(--danger);
+}
+
+/* ------------------------------------------------------------------ tables */
+
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+table.data th,
+table.data td {
+  border: 1px solid var(--border);
+  padding: 3px 6px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+table.data th {
+  background: var(--chrome);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+
+table.data tr:hover td {
+  background: #f2f6ff;
+}
+
+table.data td.num {
+  text-align: right;
+  font-family: var(--mono);
+}
+
+.pill {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  background: var(--chrome);
+  border: 1px solid var(--border);
+}
+
+.pill.ok {
+  background: #e2f4ea;
+  border-color: #b7e0c8;
+  color: var(--ok);
+}
+
+.pill.warn {
+  background: #fdeccf;
+  border-color: #f2d9a8;
+  color: #8a5a00;
+}
+
+.pill.err {
+  background: #fbdde5;
+  border-color: #f3bccd;
+  color: var(--danger);
+}
+
+/* ------------------------------------------------------------------ charts */
+
+.chart-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.chart-card header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.chart-card header .spacer {
+  flex: 1;
+}
+
+.chart-card .chart-body {
+  padding: 6px;
+}
+
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 6px 8px 0;
+  font-size: 11.5px;
+}
+
+.legend .item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend .swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+/* --------------------------------------------------------------- kpis */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.kpi {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--panel);
+}
+
+.kpi .k {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.kpi .v {
+  font-size: 18px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.hint {
+  color: var(--text-dim);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 10px 0;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+.empty-note {
+  padding: 22px 10px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+/* ----------------------------------------------------------------- dialogs */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+}
+
+.modal {
+  background: var(--panel);
+  border-radius: 8px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.28);
+  min-width: 380px;
+  max-width: 92vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.modal .body {
+  padding: 14px;
+  overflow: auto;
+}
+
+.modal footer {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.fn-list {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.fn-list div {
+  padding: 4px 8px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.fn-list div:hover {
+  background: var(--accent-soft);
+}
+
+.fn-list div.sel {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------- scrollbar */
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c3c9d1;
+  border-radius: 6px;
+  border: 3px solid var(--panel);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

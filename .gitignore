@@ -1,0 +1,8 @@
+node_modules/
+dist/
+release/
+.selftest.mjs
+.probe.mjs
+.dbg.mjs
+*.log
+.DS_Store
